@@ -956,6 +956,12 @@ class AxiMasterRead(Region, Reset):
 
             rid = int(getattr(r, 'rid', 0))
 
+            for key, value in self.active_id.items():
+                if 1 == value:
+                    rid = key
+                    break
+            #print(rid, self.active_id, self.active_id[rid])
+
             assert self.active_id[rid] > 0, "unexpected burst ID"
 
             self.tag_context_manager.put_resp(rid, r)
