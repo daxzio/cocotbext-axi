@@ -36,6 +36,21 @@ from .address_space import Region
 from .reset import Reset
 
 
+class _OpResult:
+    """Completion signal that keeps its payload off cocotb's Event.data field."""
+
+    def __init__(self):
+        self._event = Event()
+        self.result = None
+
+    def set(self, result=None):
+        self.result = result
+        self._event.set()
+
+    def wait(self):
+        return self._event.wait()
+
+
 # AXI lite master write helper objects
 class AxiLiteWriteCmd(NamedTuple):
     address: int
@@ -194,7 +209,7 @@ class AxiLiteMasterWrite(Region, Reset):
         if not self.awprot_present and prot != AxiProt.NONSECURE:
             raise ValueError("awprot sideband signal value specified, but signal is not connected")
 
-        event = Event()
+        event = _OpResult()
         data = bytes(data)
 
         self.in_flight_operations += 1
@@ -202,7 +217,7 @@ class AxiLiteMasterWrite(Region, Reset):
 
         await self.write_command_queue.put(AxiLiteWriteCmd(address, data, prot, event))
         await event.wait()
-        return event.data
+        return event.result
 
     async def _write_wrapper(self, address, data, prot, event):
         event.set(await self.write(address, data, prot))
@@ -211,10 +226,10 @@ class AxiLiteMasterWrite(Region, Reset):
         if state:
             self.log.info("Reset asserted")
             if self._process_write_cr is not None:
-                self._process_write_cr.kill()
+                self._process_write_cr.cancel()
                 self._process_write_cr = None
             if self._process_write_resp_cr is not None:
-                self._process_write_resp_cr.kill()
+                self._process_write_resp_cr.cancel()
                 self._process_write_resp_cr = None
 
             self.aw_channel.clear()
@@ -446,7 +461,7 @@ class AxiLiteMasterRead(Region, Reset):
         if not self.arprot_present and prot != AxiProt.NONSECURE:
             raise ValueError("arprot sideband signal value specified, but signal is not connected")
 
-        event = Event()
+        event = _OpResult()
 
         self.in_flight_operations += 1
         self._idle.clear()
@@ -454,7 +469,7 @@ class AxiLiteMasterRead(Region, Reset):
         await self.read_command_queue.put(AxiLiteReadCmd(address, length, prot, event))
 
         await event.wait()
-        return event.data
+        return event.result
 
     async def _read_wrapper(self, address, length, prot, event):
         event.set(await self.read(address, length, prot))
@@ -463,10 +478,10 @@ class AxiLiteMasterRead(Region, Reset):
         if state:
             self.log.info("Reset asserted")
             if self._process_read_cr is not None:
-                self._process_read_cr.kill()
+                self._process_read_cr.cancel()
                 self._process_read_cr = None
             if self._process_read_resp_cr is not None:
-                self._process_read_resp_cr.kill()
+                self._process_read_resp_cr.cancel()
                 self._process_read_resp_cr = None
 
             self.ar_channel.clear()
