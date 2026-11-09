@@ -413,8 +413,8 @@ class StreamSink(StreamMonitor, StreamPause):
             await clock_edge_event
 
             # read handshake signals
-            ready_sample = not has_ready or self.ready.value
-            valid_sample = not has_valid or self.valid.value
+            ready_sample = not has_ready or self.ready.value.resolve("zeros")
+            valid_sample = not has_valid or self.valid.value.resolve("zeros")
 
             if ready_sample and valid_sample:
                 obj = self._transaction_obj()
